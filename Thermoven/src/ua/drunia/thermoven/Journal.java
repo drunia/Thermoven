@@ -139,4 +139,41 @@ public class Journal {
 				}
 		}
 	}
+	
+	/**
+	 * Читает заипси из журнала по:
+	 * @param devName - Имени устройства ("" - не задано)
+	 * @param devType - Типу устройства  (0 - не задано)
+	 * @param timeStamp - Времени записи (0 - не задано)
+	 * @return {@link ResultSet}
+	 */
+	public ResultSet readValue(String devName, int devType, int timeStamp) {
+		String sql = "SELECT * FROM data WHERE dev_name = ? AND dev_type = ? AND timestamp = ?";
+		try {
+			PreparedStatement stmt = dbConnection.prepareStatement(sql);
+			// Имя устройства
+			if (devName.equals("")) {
+				stmt.setString(1, "%");
+			} else { 
+				stmt.setString(1, devName);
+			}
+			// Тип устройства
+			if (devType == 0) {
+				stmt.setString(2, "%");
+			} else {
+				stmt.setInt(2, devType);
+			}
+			// Время записи
+			if (timeStamp == 0) {
+				stmt.setString(3, "%");
+			} else {
+				stmt.setInt(3, timeStamp);
+			} 
+			
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
+	}
 }
