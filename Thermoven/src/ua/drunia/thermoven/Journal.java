@@ -26,7 +26,7 @@ public class Journal {
 	//Статический конструктор класса 
 	private static Journal instance = new Journal();
 	//Сединение с бд
-	private Connection dbConnection;
+	public Connection dbConnection;
 	
 	/**
 	 * Приватный конструтор
@@ -64,8 +64,9 @@ public class Journal {
 			int rowsCount = -1;
 			while (result.next()) rowsCount++;
 			
-			if (rowsCount == 0) { //Если таблиц в БД нет
-				//Создаем новую БД
+			// Если таблиц в БД нет
+			if (rowsCount == 0) { 
+				// Создаем новую БД
 				System.out.println(Journal.class.getName() +  ": Creating new db...");
 				sql = "CREATE TABLE IF NOT EXISTS data " +
 						"(id INTEGER PRIMARY KEY AUTOINCREMENT, dev_name TEXT NOT NULL, " + 
@@ -79,7 +80,7 @@ public class Journal {
 				stmt.executeUpdate(sql);
 			} 
 			
-			//Получим версию БД
+			// Получим версию БД
 			sql = "SELECT db_ver FROM config;";
 			result = stmt.executeQuery(sql);
 			
@@ -113,7 +114,7 @@ public class Journal {
 	 * @param devName - Имя устройства
 	 * @param devType - Тип устройства
 	 */
-	public void writeValue(String devName, int devType, int value) {
+	public boolean writeValue(String devName, int devType, int value) {
 		String sql = "INSERT INTO data (dev_name, dev_type, value, timestamp) VALUES (?,?,?,?)";
 		PreparedStatement stmt = null;
 		try {
@@ -122,10 +123,7 @@ public class Journal {
 			stmt.setInt(2, devType);
 			stmt.setInt(3, value);
 			stmt.setLong(4, Calendar.getInstance().getTimeInMillis());
-			if (stmt.executeUpdate() > 0) { 
-				System.out.println(Journal.class.getName() + " write to journal: devName = " +
-						devName + " devType = " + devType + " value = " + value);
-			}
+			return (stmt.executeUpdate() > 0);
 		} catch (SQLException e) {
 			//Ошибка при выполнении инсерта
 			e.printStackTrace();
@@ -138,42 +136,69 @@ public class Journal {
 					e.printStackTrace();
 				}
 		}
+		return false;
 	}
 	
 	/**
 	 * Читает заипси из журнала по:
 	 * @param devName - Имени устройства ("" - не задано)
-	 * @param devType - Типу устройства  (0 - не задано)
-	 * @param timeStamp - Времени записи (0 - не задано)
+	 * @param devType - Типу устройства  (0  - не задано)
+	 * @param timeStamp - Времени записи (0  - не задано)
 	 * @return {@link ResultSet}
+	 * @throws SQLException 
+	 * 
+	 * Выбираются записи > timeStamp!
+	 * Например нужно выбрать все записи по времени за час:
+	 * 
+	 * 	long now = Calendar.getInstance().getTimeInMillis();
+	 * 	int hour = 60 * 60 * 1000; 
+	 * 	readValue("", 0, now - hour, now);	
 	 */
-	public ResultSet readValue(String devName, int devType, int timeStamp) {
-		String sql = "SELECT * FROM data WHERE dev_name = ? AND dev_type = ? AND timestamp = ?";
+	public ResultSet readValue(String devName, int devType,
+			long timeStampFrom, long timeStampTo) throws SQLException {
+		
+		String sql = "SELECT * FROM data WHERE dev_name LIKE ? " +
+				" AND dev_type LIKE ? AND timestamp > ? AND timestamp < ?";
+		PreparedStatement stmt = dbConnection.prepareStatement(sql);
+		
+		// Имя устройства
+		if (devName.equals("")) {
+			stmt.setString(1, "%");
+		} else { 
+			stmt.setString(1, devName);
+		}
+		// Тип устройства
+		if (devType == 0) {
+			stmt.setString(2, "%");
+		} else {
+			stmt.setInt(2, devType);
+		}
+		
+		// Время записи С
+		stmt.setLong(3, timeStampFrom);
+		// Время записи ПО
+		stmt.setLong(4, timeStampTo);
+		
+		return stmt.executeQuery();
+	}
+	
+	/**
+	 * Возращает кол-во записей в журнале
+	 * @return int
+	 */
+	public int getRecordsCount() {
+		String sql = "SELECT COUNT(*) FROM data";
+		Statement stmt = null;
 		try {
-			PreparedStatement stmt = dbConnection.prepareStatement(sql);
-			// Имя устройства
-			if (devName.equals("")) {
-				stmt.setString(1, "%");
-			} else { 
-				stmt.setString(1, devName);
-			}
-			// Тип устройства
-			if (devType == 0) {
-				stmt.setString(2, "%");
-			} else {
-				stmt.setInt(2, devType);
-			}
-			// Время записи
-			if (timeStamp == 0) {
-				stmt.setString(3, "%");
-			} else {
-				stmt.setInt(3, timeStamp);
-			} 
-			
+			stmt = dbConnection.createStatement();
+			ResultSet rs = stmt.executeQuery(sql);
+			int count = rs.getInt(1);
+			stmt.close();
+			return count;
 		} catch (SQLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		return null;
+		return 0;
 	}
+	
 }

@@ -3,6 +3,9 @@
  */
 package ua.drunia.thermoven;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Calendar;
 import java.util.Observable;
 
 import javax.swing.SwingUtilities;
@@ -48,7 +51,8 @@ public class Thermoven extends Observable {
 				}
 		});
 		
-		journal.writeValue("Temp1", 1, 25);
+		System.out.println("Total records: " + journal.getRecordsCount());
+		
 	}
 	
 	/**
