@@ -2,6 +2,8 @@ package ua.drunia.thermoven.ui;
 
 import java.util.Observable;
 import java.util.Observer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
@@ -16,7 +18,7 @@ public class JMainFrame extends JFrame implements Observer {
 	private ChartPanel chartPanel;
 	
 	//Constructor
-	public JMainFrame(Observable model) {
+	public JMainFrame(final Observable model) {
 		super("Thermoven");
 		setSize(640, 480);
 		setLocationRelativeTo(null);
@@ -25,7 +27,21 @@ public class JMainFrame extends JFrame implements Observer {
 		this.model = (Thermoven) model;
 		model.addObserver(this);
 		
-		chartPanel = new ChartPanel(this.model.getChart());
+		chartPanel = new ChartPanel(
+				this.model.getChart("Температура", "t C'", "По часам", "DS18B20")
+				);
+		add(chartPanel);
+		
+		Timer timer = new Timer("Update");
+		timer.schedule(new TimerTask() {
+			
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				chartPanel.setChart(((Thermoven) model).getChart("Температура", "t C'", "По часам", "DS18B20"));
+				System.out.println("Timer: Update!");
+			}
+		}, 0, 1000);
 	}
 	
 	
@@ -33,7 +49,8 @@ public class JMainFrame extends JFrame implements Observer {
 	@Override
 	public void update(Observable o, Object arg) {
 		System.out.println("data update!");
-		JOptionPane.showMessageDialog(this, "data update!");
 	}
+	
+	
 	
 }

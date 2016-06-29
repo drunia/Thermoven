@@ -1,10 +1,3 @@
-/**
- * Singleton
- * 
- * Класс - журнал оперирующий данными о температуре
- * Данный класс сохраняет данные поступающие с датчика,
- * получает за указаный интервал. sqlite
- */
 package ua.drunia.thermoven;
 
 import java.sql.Connection;
@@ -17,6 +10,11 @@ import java.sql.Statement;
 import java.util.Calendar;
 
 /**
+ * Singleton
+ * 
+ * Класс - журнал оперирующий данными от датчиков
+ * Данный класс сохраняет данные поступающие с датчика,
+ * и получает их за указаный интервал. БД sqlite
  * @author drunia
  */
 public class Journal {
@@ -70,7 +68,7 @@ public class Journal {
 				System.out.println(Journal.class.getName() +  ": Creating new db...");
 				sql = "CREATE TABLE IF NOT EXISTS data " +
 						"(id INTEGER PRIMARY KEY AUTOINCREMENT, dev_name TEXT NOT NULL, " + 
-						"dev_type INTEGER NOT NULL, value INTEGER NOT NULL, timestamp INTEGER NOT NULL);";
+						"dev_type INTEGER NOT NULL, value REAL NOT NULL, timestamp INTEGER NOT NULL);";
 				stmt.execute(sql);
 				
 				sql = "CREATE TABLE config (db_ver INTEGER);";
@@ -85,7 +83,70 @@ public class Journal {
 			result = stmt.executeQuery(sql);
 			
 			int dbVer = result.getInt("db_ver");
-			System.out.println(Journal.class.getName() + ": db ver: " + dbVer);
+			System.out.println(Journal.class.getName() + ": db ver = " + dbVer);
+			
+			// Проверим нужно ли обновлять текущую БД
+			if (dbVer < DB_VER) {
+				
+				System.out.println(Journal.class.getName() +
+						": Need update db " + dbVer + " -> " + DB_VER);
+				
+				// Обновляем ...
+				dbConnection.setAutoCommit(false);
+				for (int i = (dbVer + 1); i <= DB_VER; i++) {
+					switch (i) {
+					case 2:
+						// Обновляем БД до 2-й версии (Пример)
+						try {
+							sql = "CREATE TABLE abc (" +
+									"id INTEGER PRIMARY KEY AUTOINCREMENT, value INTEGER)";
+							// Вносим изменения в БД
+							stmt.executeUpdate(sql);
+							
+						} catch (SQLException e) {
+							e.printStackTrace();
+							dbConnection.rollback();
+							return;
+						}
+						break;
+					case 3:
+						// Обновляем БД до 3-й версии
+						sql = "insert your sql hear";
+						try {
+							// Вносим изменения в БД
+							stmt.executeUpdate(sql);
+						} catch (SQLException e) {
+							e.printStackTrace();
+							dbConnection.rollback();
+							return;
+						}
+						break;
+					default:
+						System.err.println(Journal.class.getName() + ": Error db version!");
+						break;
+					}
+					
+					//Пишем новую версию текущей БД
+					sql = "UPDATE config SET db_ver=" + i;
+					try {
+						stmt.executeUpdate(sql);
+					} catch (SQLException e) {
+						e.printStackTrace();
+						dbConnection.rollback();
+						return;
+					}
+					
+				}
+				dbConnection.commit();
+				dbConnection.setAutoCommit(true);
+				
+				System.out.println(Journal.class.getName() +
+						": database version from " + dbVer +
+						" to " + DB_VER + " updated sucessfully!");
+			} else {
+				System.out.println(Journal.class.getName() + ": No update db needed.");
+			}
+			
 		} catch (SQLException e) {
 			e.printStackTrace();
 			return;
@@ -110,18 +171,18 @@ public class Journal {
 	
 	/**
 	 * Сохраняет значение с устройства в журнал
-	 * @param value - Значение полученое с утройства
+	 * @param value - Значение полученое с устройства
 	 * @param devName - Имя устройства
 	 * @param devType - Тип устройства
 	 */
-	public boolean writeValue(String devName, int devType, int value) {
+	public boolean writeValue(String devName, int devType, float value) {
 		String sql = "INSERT INTO data (dev_name, dev_type, value, timestamp) VALUES (?,?,?,?)";
 		PreparedStatement stmt = null;
 		try {
 			stmt = dbConnection.prepareStatement(sql);
 			stmt.setString(1, devName);
 			stmt.setInt(2, devType);
-			stmt.setInt(3, value);
+			stmt.setFloat(3, value);
 			stmt.setLong(4, Calendar.getInstance().getTimeInMillis());
 			return (stmt.executeUpdate() > 0);
 		} catch (SQLException e) {
@@ -143,18 +204,22 @@ public class Journal {
 	 * Читает заипси из журнала по:
 	 * @param devName - Имени устройства ("" - не задано)
 	 * @param devType - Типу устройства  (0  - не задано)
-	 * @param timeStamp - Времени записи (0  - не задано)
-	 * @return {@link ResultSet}
-	 * @throws SQLException 
-	 * 
-	 * Выбираются записи > timeStamp!
+	 * @param timeStampFrom - Времени записи с
+	 * @param timeStampTo - Времени записи по
+	 *  
+	 * <br> 
 	 * Например нужно выбрать все записи по времени за час:
 	 * 
+	 * <blockquote><pre>
 	 * 	long now = Calendar.getInstance().getTimeInMillis();
 	 * 	int hour = 60 * 60 * 1000; 
-	 * 	readValue("", 0, now - hour, now);	
+	 * 	ResultSet rs = readValues("", 0, now - hour, now); 
+	 * </pre></blockquote>
+	 *  
+	 *  @return {@link ResultSet}
+	 *  @throws SQLException 	
 	 */
-	public ResultSet readValue(String devName, int devType,
+	public ResultSet readValues(String devName, int devType,
 			long timeStampFrom, long timeStampTo) throws SQLException {
 		
 		String sql = "SELECT * FROM data WHERE dev_name LIKE ? " +
